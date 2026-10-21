@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LinkHarvest · 链接 → 文档</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#fff; --ink:#1f2933; --muted:#6b7785;
+    --line:#e2e6ec; --brand:#1f3b57; --brand-2:#2f6f9f;
+    --ok:#1c8c5a; --warn:#b57a10; --bad:#b03a2e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 64px}
+  header h1{margin:0 0 4px;font-size:22px;letter-spacing:.5px}
+  header p{margin:0 0 22px;color:var(--muted);font-size:13px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;
+        padding:18px;margin-bottom:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+  textarea{width:100%;min-height:170px;resize:vertical;padding:12px;border:1px solid var(--line);
+           border-radius:8px;font:13px/1.6 Consolas,"Microsoft YaHei",monospace;color:var(--ink);outline:none}
+  textarea:focus{border-color:var(--brand-2);box-shadow:0 0 0 3px rgba(47,111,159,.12)}
+  .row{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:14px}
+  .row label{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
+  .row > label:has(#formats){align-items:flex-start}
+  #formats{display:inline-flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
+  #formats label{display:inline-flex;align-items:center;gap:5px}
+  input[type=number]{width:62px;padding:5px 8px;border:1px solid var(--line);border-radius:6px}
+  button{border:0;border-radius:8px;padding:10px 20px;font-size:14px;cursor:pointer;
+         background:var(--brand);color:#fff;transition:.15s}
+  button:hover{background:var(--brand-2)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.ghost{background:#eef2f6;color:var(--brand)}
+  button.ghost:hover{background:#e2e9f1}
+  .hint{color:var(--muted);font-size:12px;margin-top:8px}
+  .bar{height:8px;background:#e8edf3;border-radius:99px;overflow:hidden;margin:6px 0 12px}
+  .bar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2f6f9f,#43a047);
+           transition:width .3s}
+  .stats{display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-bottom:10px}
+  .stats b{color:var(--ink)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;background:#fafbfc}
+  td.url{max-width:330px;word-break:break-all;color:var(--muted);font-size:12px}
+  .tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11px;line-height:18px}
+  .tag.ok{background:#e6f4ec;color:var(--ok)}
+  .tag.partial{background:#fdf3e2;color:var(--warn)}
+  .tag.failed{background:#fbeae8;color:var(--bad)}
+  .files{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .files a{display:inline-flex;align-items:center;gap:6px;text-decoration:none;color:var(--brand);
+           background:#eef2f6;border-radius:8px;padding:8px 14px;font-size:13px}
+  .files a:hover{background:#e2e9f1}
+  .empty{color:var(--muted);text-align:center;padding:26px 0;font-size:13px}
+  .err{color:var(--bad);font-size:12px}
+  .hidden{display:none}
+  .sites-toggle{cursor:pointer;color:var(--brand);font-size:13px;font-weight:600;
+                user-select:none;outline:none}
+  .sites-toggle:hover{color:var(--brand-2)}
+  table.sites{margin-top:12px}
+  table.sites td:first-child{font-family:Consolas,monospace;font-size:12px}
+  table.sites td:last-child{color:var(--muted);font-size:12px}
+  .advanced{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+  .cookies-box{min-height:90px;font-size:12px;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>LinkHarvest · 链接 → 文档</h1>
+    <p>粘贴一堆链接，抓取标题、正文、发布时间，导出 Word / Markdown / Excel / JSON。</p>
+  </header>
+
+  <div class="card">
+    <textarea id="links" placeholder="一行一个链接，直接粘贴也行：
+https://www.ruanyifeng.com/blog/2024/01/weekly-issue-286.html
+https://realpython.com/async-io-python/
+- https://github.com/adbar/trafilatura"></textarea>
+    <div class="row">
+      <label>并发 <input type="number" id="concurrency" value="6" min="1" max="16"></label>
+      <label>同站间隔 <input type="number" id="hostDelay" value="1" min="0" max="30" step="0.5"> 秒</label>
+      <label><input type="checkbox" id="useBrowser" checked> 失败时用浏览器重试</label>
+      <label><input type="checkbox" id="downloadImages"> 下载正文图片</label>
+      <label>格式</label>
+      <span id="formats">
+        <label><input type="checkbox" value="docx" checked> Word</label>
+        <label><input type="checkbox" value="md" checked> Markdown</label>
+        <label><input type="checkbox" value="xlsx" checked> Excel</label>
+        <label><input type="checkbox" value="json" checked> JSON</label>
+      </span>
+    </div>
+    <div class="row">
+      <button id="start">开始抓取</button>
+      <button id="clear" class="ghost">清空</button>
+      <span class="hint" id="linkCount">0 条链接</span>
+    </div>
+
+    <details class="advanced">
+      <summary class="sites-toggle">高级：导入 Cookie（对付虎嗅这类滑块验证）</summary>
+      <p class="hint" style="margin:10px 0 6px">
+        把浏览器扩展导出的 cookies.txt 内容直接粘贴进来；留空则不使用。
+        这个站点验证一次后可以反复用，直到 cookie 过期。
+      </p>
+      <textarea id="cookies" class="cookies-box"
+        placeholder="# Netscape HTTP Cookie File
+.huxiu.com	TRUE	/	FALSE	1893456000	acw_tc	xxxxx"></textarea>
+      <div class="row">
+        <button id="capture" class="ghost">验证并自动获取 Cookie</button>
+        <span class="hint" id="captureHint">
+          会弹出一个浏览器窗口，你手动过验证后点这里，工具自动把 cookie 填进来
+        </span>
+      </div>
+    </details>
+  </div>
+
+  <div class="card hidden" id="progressCard">
+    <div class="bar"><i id="barFill"></i></div>
+    <div class="stats">
+      <span>进度 <b id="sProgress">0/0</b></span>
+      <span>成功 <b id="sOk">0</b></span>
+      <span>部分 <b id="sPartial">0</b></span>
+      <span>失败 <b id="sFailed">0</b></span>
+      <span>用时 <b id="sElapsed">0s</b></span>
+      <span id="sStatus"></span>
+    </div>
+    <div class="files hidden" id="files"></div>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary class="sites-toggle">已知反爬站点策略表（这些站点会自动放慢、必要时串行）</summary>
+      <table class="sites">
+        <thead>
+          <tr><th style="width:170px">站点</th><th style="width:110px">策略</th><th>说明</th></tr>
+        </thead>
+        <tbody id="siteRows"><tr><td colspan="3" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </details>
+  </div>
+
+  <div class="card" id="resultCard">
+    <div class="empty" id="emptyHint">抓取结果会显示在这里</div>
+    <div class="hidden" id="tableWrap">
+      <table>
+        <thead>
+          <tr><th style="width:34px">#</th><th>标题</th><th style="width:96px">时间</th>
+              <th style="width:88px">状态</th><th style="width:64px">字数</th><th style="width:56px">图</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const URL_RE = /https?:\/\/[^\s<>"'）)\]】，。；]+/gi;
+
+function countLinks(){
+  const found = ($("links").value.match(URL_RE) || []);
+  $("linkCount").textContent = `${new Set(found).size} 条链接`;
+}
+$("links").addEventListener("input", countLinks);
+$("clear").onclick = () => { $("links").value = ""; countLinks(); $("links").focus(); };
+
+function esc(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function tagOf(status){
+  if (status === "ok") return '<span class="tag ok">成功</span>';
+  if (status === "partial") return '<span class="tag partial">部分</span>';
+  return '<span class="tag failed">失败</span>';
+}
+
+let timer = null;
+
+async function start(){
+  const links = $("links").value.trim();
+  if (!links) { alert("先粘贴几个链接吧"); return; }
+  const formats = [...document.querySelectorAll("#formats input:checked")].map(i => i.value);
+  if (!formats.length) { alert("至少选一种输出格式"); return; }
+
+  $("start").disabled = true;
+  $("start").textContent = "抓取中…";
+  $("progressCard").classList.remove("hidden");
+  $("files").classList.add("hidden");
+  $("files").innerHTML = "";
+  $("rows").innerHTML = "";
+  $("emptyHint").classList.remove("hidden");
+  $("tableWrap").classList.add("hidden");
+  $("sStatus").textContent = "";
+
+  let taskId;
+  try {
+    const resp = await fetch("/api/harvest", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        links,
+        concurrency: Number($("concurrency").value) || 6,
+        host_delay: Number($("hostDelay").value),
+        use_browser: $("useBrowser").checked,
+        download_images: $("downloadImages").checked,
+        cookies: $("cookies").value,
+        formats,
+      }),
+    });
+    if (!resp.ok) {
+      const detail = await resp.json().catch(() => ({}));
+      throw new Error(detail.detail || ("HTTP " + resp.status));
+    }
+    taskId = (await resp.json()).id;
+  } catch (err) {
+    $("sStatus").innerHTML = `<span class="err">启动失败：${esc(err.message)}</span>`;
+    resetButton();
+    return;
+  }
+  poll(taskId);
+}
+
+function resetButton(){
+  $("start").disabled = false;
+  $("start").textContent = "开始抓取";
+}
+
+function poll(taskId){
+  clearInterval(timer);
+  timer = setInterval(async () => {
+    let data;
+    try {
+      const resp = await fetch(`/api/tasks/${taskId}`);
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      data = await resp.json();
+    } catch (err) {
+      clearInterval(timer); resetButton();
+      $("sStatus").innerHTML = `<span class="err">读取进度失败：${esc(err.message)}</span>`;
+      return;
+    }
+    render(data);
+    if (data.status !== "running") {
+      clearInterval(timer);
+      resetButton();
+      $("sStatus").textContent = data.status === "done" ? "已完成" : "出错";
+      if (data.error) $("sStatus").innerHTML = `<span class="err">${esc(data.error)}</span>`;
+    }
+  }, 800);
+}
+
+function render(data){
+  const pct = data.total ? Math.round(data.done / data.total * 100) : 0;
+  $("barFill").style.width = pct + "%";
+  $("sProgress").textContent = `${data.done}/${data.total}`;
+  $("sOk").textContent = data.ok;
+  $("sPartial").textContent = data.partial;
+  $("sFailed").textContent = data.failed;
+  $("sElapsed").textContent = data.elapsed + "s";
+
+  if (data.items && data.items.length) {
+    $("emptyHint").classList.add("hidden");
+    $("tableWrap").classList.remove("hidden");
+    $("rows").innerHTML = data.items.map((it, i) => {
+      const title = esc(it.title || it.url);
+      const tip = it.error ? `<div class="err">${esc(it.error)}</div>` : "";
+      return `<tr>
+        <td>${i + 1}</td>
+        <td><div>${title}</div><div class="url">${esc(it.url)}</div>${tip}</td>
+        <td>${esc(it.date || "—")}</td>
+        <td>${tagOf(it.status)}</td>
+        <td>${it.chars}</td>
+        <td>${it.images}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  if (data.files && data.files.length) {
+    $("files").classList.remove("hidden");
+    const label = {docx:"Word 文档", md:"Markdown", xlsx:"Excel 表格", json:"JSON 数据",
+                   failed_md:"失败清单 (md)", failed_csv:"失败清单 (csv)"};
+    $("files").innerHTML = data.files.map(f =>
+      `<a href="${f.url}" download>⬇ ${esc(label[f.kind] || f.kind)}</a>`).join("");
+  }
+}
+
+async function captureCookie(){
+  // 从链接框里取第一个链接作为验证目标
+  const found = ($("links").value.match(URL_RE) || []);
+  if (!found.length) { alert("先在链接框里贴一个要验证的网址"); return; }
+  const url = found[0];
+
+  $("capture").disabled = true;
+  $("capture").textContent = "等待验证…";
+  $("captureHint").textContent = "已弹出浏览器窗口，请在里面完成验证，然后回到本页点【验证完成】";
+
+  try {
+    const resp = await fetch("/api/capture-session", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({url, cookies: $("cookies").value}),
+    });
+    if (!resp.ok) {
+      const detail = await resp.json().catch(() => ({}));
+      throw new Error(detail.detail || ("HTTP " + resp.status));
+    }
+    const data = await resp.json();
+    $("cookies").value = data.cookies;
+    $("captureHint").textContent =
+      `已获取 ${data.count} 条 cookie，已自动填入上方。现在点【开始抓取】即可。`;
+  } catch (err) {
+    $("captureHint").innerHTML =
+      `<span class="err">获取失败：${esc(err.message)}</span>`;
+  } finally {
+    $("capture").disabled = false;
+    $("capture").textContent = "验证并自动获取 Cookie";
+  }
+}
+
+async function loadSites(){
+  try {
+    const resp = await fetch("/api/sites");
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const sites = await resp.json();
+    $("siteRows").innerHTML = sites.map(s => `<tr>
+      <td>${esc(s.host)}</td>
+      <td>${esc(s.label)}${s.browser_first ? " · 直连浏览器" : ""}</td>
+      <td>${esc(s.note)}</td>
+    </tr>`).join("");
+  } catch (err) {
+    $("siteRows").innerHTML =
+      `<tr><td colspan="3" class="empty">策略表加载失败：${esc(err.message)}</td></tr>`;
+  }
+}
+
+$("start").onclick = start;
+$("capture").onclick = captureCookie;
+countLinks();
+loadSites();
+</script>
+</body>
+</html>

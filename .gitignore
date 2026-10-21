@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# 抓取产物（体积大，且每次都不一样）
+output/
+
+# 个人测试用的链接清单，不公开
+test_case.txt
+
+# 会话与 cookie 是登录凭证，绝对不要提交
+session.json
+*.session.json
+cookies.txt
+*.cookies.txt
+storage_state.json
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
