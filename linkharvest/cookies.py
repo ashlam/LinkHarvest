@@ -4,19 +4,14 @@
 全新的无头浏览器，即使页面本身没有登录墙。但你的日常浏览器里已经有一份
 "通过验证"的 cookie，把它拿过来就能正常抓。
 
-支持三种来源：
+支持两种来源：
   1. Netscape 格式的 cookies.txt（浏览器扩展导出，最通用）
   2. Playwright 的 storage_state JSON（--save-session 生成的）
-  3. 直接读取本机 Chrome/Edge 的 profile 目录（浏览器需先关闭）
 """
 
 from __future__ import annotations
 
 import json
-import os
-import shutil
-import sqlite3
-import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -126,84 +121,3 @@ def to_netscape_cookies(cookies: list[dict]) -> str:
         )
     return "\n".join(lines) + "\n"
 
-
-# --------------------------------------------------------------------------- 浏览器 profile
-
-
-CHROMIUM_PROFILES = {
-    "edge": r"%LOCALAPPDATA%\Microsoft\Edge\User Data",
-    "chrome": r"%LOCALAPPDATA%\Google\Chrome\User Data",
-    "chromium": r"%LOCALAPPDATA%\Chromium\User Data",
-    "brave": r"%LOCALAPPDATA%\BraveSoftware\Brave-Browser\User Data",
-}
-
-
-def find_cookie_db(browser: str = "edge", profile: str = "Default") -> Path | None:
-    """定位浏览器的 cookie 数据库文件。"""
-    root = CHROMIUM_PROFILES.get(browser.lower())
-    if not root:
-        return None
-    base = Path(os.path.expandvars(root)) / profile
-    for candidate in (base / "Network" / "Cookies", base / "Cookies"):
-        if candidate.exists():
-            return candidate
-    return None
-
-
-def read_chromium_cookies(
-    browser: str = "edge", profile: str = "Default"
-) -> tuple[list[dict], str]:
-    """读取本机 Chromium 系浏览器的 cookie。
-
-    注意：浏览器运行时数据库被独占锁定，必须先完全退出浏览器。
-    返回 (cookies, 提示信息)。解密失败时返回空列表并说明原因。
-    """
-    db = find_cookie_db(browser, profile)
-    if db is None:
-        return [], f"没找到 {browser} 的 cookie 数据库（profile={profile}）"
-
-    tmp = Path(tempfile.gettempdir()) / f"lh-cookies-{os.getpid()}.db"
-    try:
-        shutil.copy2(db, tmp)
-    except PermissionError:
-        return [], (
-            f"{browser} 正在运行，cookie 数据库被锁定。"
-            f"请先完全退出 {browser}（包括托盘图标里的后台进程）再试，"
-            "或改用导出的 cookies.txt"
-        )
-    except Exception as exc:  # noqa: BLE001
-        return [], f"读取 cookie 数据库失败：{exc}"
-
-    try:
-        con = sqlite3.connect(tmp)
-        rows = con.execute(
-            "SELECT host_key, name, encrypted_value, path, expires_utc, is_secure "
-            "FROM cookies"
-        ).fetchall()
-        con.close()
-    except Exception as exc:  # noqa: BLE001
-        return [], f"解析 cookie 数据库失败：{exc}"
-    finally:
-        tmp.unlink(missing_ok=True)
-
-    cookies: list[dict] = []
-    encrypted = 0
-    for host, name, enc_value, path, expires, secure in rows:
-        if enc_value:
-            encrypted += 1
-            continue
-        cookies.append({
-            "name": name,
-            "value": enc_value.decode() if isinstance(enc_value, bytes) else str(enc_value),
-            "domain": host,
-            "path": path or "/",
-            "secure": bool(secure),
-        })
-
-    if encrypted and not cookies:
-        return [], (
-            f"找到 {encrypted} 条 cookie，但都是加密的（Chromium 用 DPAPI 加密）。"
-            "命令行直接解密需要额外依赖，建议改用浏览器扩展导出 cookies.txt，"
-            "或用 --save-session 让工具自己保存会话"
-        )
-    return cookies, ""

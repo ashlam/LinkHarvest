@@ -9,8 +9,13 @@
 
 ## 快速开始
 
+需要 **Python 3.10+**（用到了 `X | None` 这类新语法）。Windows / macOS / Linux 都能跑，
+核心代码是纯 Python，没有任何平台绑定。
+
 ```bash
 # 1. 安装依赖（建议先建虚拟环境）
+python -m venv .venv
+source .venv/bin/activate        # Windows 用 .venv\Scripts\activate
 pip install -r requirements.txt
 
 # 2. 安装浏览器内核（只有需要抓 JS 渲染页面时才用得上，但建议装上）
@@ -20,10 +25,26 @@ python -m playwright install chromium
 python -m linkharvest samples/links.txt -o output
 
 # 3B. 命令行：直接从剪贴板/终端粘贴
-python -m linkharvest            # 粘贴链接，Ctrl+Z 回车结束（macOS/Linux 用 Ctrl+D）
+python -m linkharvest            # 粘贴链接，Ctrl+D 结束（Windows 用 Ctrl+Z 回车）
 
 # 3C. 本地网页界面
 python -m linkharvest.web        # 自动打开 http://127.0.0.1:8765
+```
+
+### 各平台说明
+
+| 平台 | 启动方式 | 备注 |
+| --- | --- | --- |
+| **Windows** | 双击 `启动网页界面.bat` / `抓取链接.bat`，或直接用上面的命令 | `.bat` 只是给命令套了个壳，方便双击 |
+| **macOS / Linux** | 用上面的 `python -m linkharvest...` 命令 | `.bat` 文件在这两个系统上无法运行，忽略即可 |
+
+macOS / Linux 用户如果想有双击体验，可以自己写个 shell 脚本：
+
+```bash
+# 保存为 start-web.sh，然后 chmod +x start-web.sh
+#!/usr/bin/env bash
+cd "$(dirname "$0")"
+python3 -m linkharvest.web "$@"
 ```
 
 链接文件格式很宽松：一行一个、Markdown 列表、甚至整段从聊天窗口复制出来的文字都能识别，
