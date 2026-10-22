@@ -300,10 +300,31 @@ class BrowserFetcher:
         from playwright.sync_api import sync_playwright
 
         self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch(
-            headless=self.opts.headless,
-            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
-        )
+        args = ["--disable-blink-features=AutomationControlled", "--no-sandbox"]
+
+        # 优先复用本机已装的 Chrome/Edge，没有再用 Playwright 自带内核。
+        # 好处：打包分发时不必附带几百 MB 的浏览器，用户装了 Chrome 就能用；
+        # 而且真实浏览器的指纹更像真人，不容易被 WAF 判定为机器人。
+        launched = None
+        last_err: Exception | None = None
+        for channel in ("chrome", "msedge", None):
+            try:
+                kwargs = {"channel": channel} if channel else {}
+                launched = self._playwright.chromium.launch(
+                    headless=self.opts.headless, args=args, **kwargs
+                )
+                break
+            except Exception as exc:  # noqa: BLE001 - 换下一个渠道
+                last_err = exc
+                continue
+
+        if launched is None:
+            raise RuntimeError(
+                "找不到可用的浏览器。请安装 Chrome/Edge，"
+                "或执行 `python -m playwright install chromium`。"
+                f"（最后一次错误：{last_err}）"
+            )
+        self._browser = launched
         self._context = self._browser.new_context(
             user_agent=self.opts.user_agent,
             locale="zh-CN",

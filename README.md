@@ -52,6 +52,46 @@ python3 -m linkharvest.web "$@"
 
 ---
 
+## 分发给别人用（免安装 exe）
+
+如果对方不熟悉技术、电脑上也没有 Python，可以直接把打包好的 exe 发给他。
+
+### 打包
+
+```bash
+pip install pyinstaller
+python -m PyInstaller build_exe.spec --noconfirm
+# 产物在 dist/LinkHarvest/，压缩后约 70 MB
+```
+
+### 对方怎么用
+
+解压后双击 `LinkHarvest.exe`，会出现一个菜单：
+
+```
+  1  粘贴链接，抓取成文档（推荐）
+  2  打开图形界面（浏览器里操作）
+  3  退出
+```
+
+选 `1`，把链接粘进去（一行一个），另起一行输入 `END` 回车即可。
+结果自动生成在 exe 旁边的 `output/` 文件夹里，跑完会自动打开。
+
+exe 里已经带了完整使用说明（`使用说明.txt`），对方不需要看 README。
+
+### 打包时的几个取舍
+
+- **不捆绑浏览器**：Playwright 的 Chromium 有 325 MB，打进去包会很大。
+  程序会优先用系统已装的 **Chrome / Edge**（Windows 10/11 基本都有 Edge），
+  找不到才提示安装。实测两者抓取效果完全一致。
+- **onedir 而非 onefile**：解压式启动更快，且杀毒软件误报率低得多。
+- **必须打包数据文件**：`justext` 的停用词表、`trafilatura` 的 `settings.cfg`
+  都不是 `.py` 文件，PyInstaller 默认不收，缺了会导致正文提取全空——这一点容易踩坑。
+- **控制台编码**：启动器会主动把 Windows 控制台切到 UTF-8，
+  否则中文标题会显示成乱码。
+
+---
+
 ## 输出
 
 默认在 `output/<时间戳>/` 下生成：

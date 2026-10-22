@@ -8,6 +8,9 @@ dist/
 venv/
 env/
 
+# 打包产物（体积大，用 GitHub Release 分发而不是提交进仓库）
+*.zip
+
 # 抓取产物（体积大，且每次都不一样）
 output/
 
